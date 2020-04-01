@@ -1,27 +1,36 @@
 #include "noncanmode.h"
 #include <iostream>
+#include "ReadInFunctions.h"
+#include "query.h"
+
 int main(){
-	std::cout << "Hello World\n";
-	struct termios SavedTermAttributes;
-    char RXChar;
-    
-    SetNonCanonicalMode(STDIN_FILENO, &SavedTermAttributes);
-    
-    while(1){
-        read(STDIN_FILENO, &RXChar, 1);
-        if(0x04 == RXChar){ // C-d
-            break;
-        }
-        else{
-            if(isprint(RXChar)){
-                printf("RX: '%c' 0x%02X\n",RXChar, RXChar);   
-            }
-            else{
-                printf("RX: ' ' 0x%02X\n",RXChar);
-            }
-        }
-    }
-    
-    ResetCanonicalMode(STDIN_FILENO, &SavedTermAttributes);
+
+	while(1){
+		//getCwd
+		std::cout << ">>";
+		std::string input;
+		getline(std::cin, input);
+		std::vector<std::string> v = parseInput(input);
+		std::string functionName = v.at(0);
+		if(functionName.compare("ls") == 0){
+			ListFiles();
+		}else if(functionName.compare("cd") == 0){
+			ChangeDirectory();
+		}else if(functionName.compare("ff") == 0){
+			FindFiles();
+		}else if(functionName.compare("pwd") == 0){
+			PrintWorkingDirectory();
+		}else if(functionName.compare("exit") == 0){
+			ExitShell();
+		}else{
+			std::cout << "Command:";
+
+			for(auto itr = v.begin(); itr != v.end(); itr++){
+				std::cout << " ";
+				std::cout << *itr;
+			}
+			std::cout << "\n";
+		}
+	}
     return 0;
 }
