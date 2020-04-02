@@ -1,16 +1,60 @@
 #include "noncanmode.h"
-#include <iostream>
 #include "ReadInFunctions.h"
 #include "query.h"
 
 int main(){
-
+	std::vector<std::string> entryLog;
+	const std::string deleteChar = std::string("\b \b");
 	while(1){
-		//getCwd
-		std::cout << ">>";
-		std::string input;
-		getline(std::cin, input);
-		std::vector<std::string> v = parseInput(input);
+
+		//Print prompt
+		struct termios SavedTermAttributes;
+    	char RXChar;
+    	SetNonCanonicalMode(STDIN_FILENO, &SavedTermAttributes);
+		std::string dir = std::string(getcwd(NULL,0));
+		if(dir.size() > 16){
+			dir= shrinkChar(dir);
+		}
+		dir += '%';
+		write(STDOUT_FILENO, dir.c_str(), dir.size());
+
+
+		std::string command;
+		bool checkArrow;
+
+		int index = entryLog.size();
+		while(1){
+	        read(STDIN_FILENO, &RXChar, 1);
+	        if(RXChar == 0x1B){
+	        	checkArrow = true;
+	        }else if(checkArrow && RXChar == '['){
+	        	char upOrDown;
+	        	read(STDIN_FILENO, &upOrDown, 1);
+	        	if(upOrDown == 'A'){
+	        		command = traverseLogUp(entryLog, index);
+	        		write(STDOUT_FILENO, command.c_str(), command.size());
+	        	}else if(upOrDown == 'B'){
+	        		command = traverseLogDown(entryLog, index);
+	        		write(STDOUT_FILENO, command.c_str(), command.size());
+	        	}
+	        }else if(RXChar == '\n'){
+	        	write(STDOUT_FILENO, &RXChar, sizeof(RXChar));
+	        	break;
+	        }else if(RXChar == 0x7F){
+	        	write(STDOUT_FILENO, deleteChar.c_str(), deleteChar.size());
+	        }else if(isprint(RXChar)){
+	        	command.push_back(RXChar);
+	        	write(STDOUT_FILENO, &RXChar, sizeof(RXChar));
+	        }
+	        
+    	}
+    	if(entryLog.size() > 10){
+    		entryLog.erase(entryLog.begin());
+    	}
+
+    	entryLog.push_back(command);
+
+		std::vector<std::string> v = parseInput(command,' ');
 		std::string functionName = v.at(0);
 		if(functionName.compare("ls") == 0){
 			ListFiles();
@@ -34,3 +78,4 @@ int main(){
 	}
     return 0;
 }
+
