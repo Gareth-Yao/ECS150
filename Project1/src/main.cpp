@@ -21,7 +21,7 @@ int main(){
 
 		std::string command;
 		bool checkArrow;
-
+		int buffersize = 0;
 		int index = entryLog.size();
 		while(1){
 	        read(STDIN_FILENO, &RXChar, 1);
@@ -31,20 +31,26 @@ int main(){
 	        	char upOrDown;
 	        	read(STDIN_FILENO, &upOrDown, 1);
 	        	if(upOrDown == 'A'){
-	        		command = traverseLogUp(entryLog, index);
-	        		write(STDOUT_FILENO, command.c_str(), command.size());
+	        		traverseLogUp(entryLog, command, index, buffersize);	        		        		
 	        	}else if(upOrDown == 'B'){
-	        		command = traverseLogDown(entryLog, index);
-	        		write(STDOUT_FILENO, command.c_str(), command.size());
+	        		traverseLogDown(entryLog, command, index, buffersize);
+	        	}else{
+	        		write(STDOUT_FILENO, &RXChar, sizeof(RXChar));
+	        		buffersize++;
 	        	}
 	        }else if(RXChar == '\n'){
 	        	write(STDOUT_FILENO, &RXChar, sizeof(RXChar));
 	        	break;
 	        }else if(RXChar == 0x7F){
 	        	write(STDOUT_FILENO, deleteChar.c_str(), deleteChar.size());
+	        	buffersize++;
+	        	if(!command.empty()){
+	        		command.pop_back();
+	        	}
 	        }else if(isprint(RXChar)){
 	        	command.push_back(RXChar);
 	        	write(STDOUT_FILENO, &RXChar, sizeof(RXChar));
+	        	buffersize++;
 	        }
 	        
     	}
