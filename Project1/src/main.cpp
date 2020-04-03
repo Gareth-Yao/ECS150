@@ -15,7 +15,7 @@ int main(){
 		if(dir.size() > 16){
 			dir= shrinkChar(dir);
 		}
-		dir += '%';
+		dir += "% ";
 		write(STDOUT_FILENO, dir.c_str(), dir.size());
 
 
@@ -63,23 +63,25 @@ int main(){
 		std::vector<std::string> v = parseInput(command,' ');
 		std::string functionName = v.at(0);
 		if(functionName.compare("ls") == 0){
-			ListFiles();
+			ListFiles(v);
 		}else if(functionName.compare("cd") == 0){
-			ChangeDirectory();
+			ChangeDirectory(v.at(1));
 		}else if(functionName.compare("ff") == 0){
-			FindFiles();
+			FindFiles(v);
 		}else if(functionName.compare("pwd") == 0){
-			PrintWorkingDirectory();
+			PrintWorkingDirectory(v);
 		}else if(functionName.compare("exit") == 0){
-			ExitShell();
+			break;
 		}else{
-			std::cout << "Command:";
-
+			char com[] = "Command:";
+			write(STDOUT_FILENO, &com, sizeof(com));
 			for(auto itr = v.begin(); itr != v.end(); itr++){
-				std::cout << " ";
-				std::cout << *itr;
+				std::string curCommand = std::string(" " + *itr);
+				write(STDOUT_FILENO, curCommand.c_str(), curCommand.size());
 			}
-			std::cout << "\n";
+
+			char newLine = '\n';
+			write(STDOUT_FILENO, &newLine, sizeof(newLine));
 		}
 	}
     return 0;

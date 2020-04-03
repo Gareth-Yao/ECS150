@@ -3,11 +3,44 @@
 #include <iostream>
 #include <string>
 #include <unistd.h>
-void ChangeDirectory(){ std::cout << "cd" << "\n";}
-void FindFiles(){ std::cout << "ff" << "\n";}
-void ListFiles(){ std::cout << "ls" << "\n";}
-void ExitShell(){ std::cout << "exit" << "\n";}
-void PrintWorkingDirectory(){ std::cout << "pwd" << "\n";}
+void ChangeDirectory(std::string path){
+ 	int returnValue = chdir(path.c_str());
+ 	if(returnValue < 0){
+ 		char errorMessage[] = "Error changing directory.\n";
+ 		write(STDOUT_FILENO, &errorMessage, sizeof(errorMessage));
+ 	}
+
+}
+void FindFiles(std::vector<std::string> v){
+	char com[] = "Command:";
+	write(STDOUT_FILENO, &com, sizeof(com));
+	for(auto itr = v.begin(); itr != v.end(); itr++){
+		std::string curCommand = std::string(" " + *itr);
+		write(STDOUT_FILENO, curCommand.c_str(), curCommand.size());
+	}
+	char newLine = '\n';
+	write(STDOUT_FILENO, &newLine, sizeof(newLine));
+}
+void ListFiles(std::vector<std::string> v){
+	char com[] = "Command:";
+	write(STDOUT_FILENO, &com, sizeof(com));
+	for(auto itr = v.begin(); itr != v.end(); itr++){
+		std::string curCommand = std::string(" " + *itr);
+		write(STDOUT_FILENO, curCommand.c_str(), curCommand.size());
+	}
+	char newLine = '\n';
+	write(STDOUT_FILENO, &newLine, sizeof(newLine));
+}
+void PrintWorkingDirectory(std::vector<std::string> v){
+	char com[] = "Command:";
+	write(STDOUT_FILENO, &com, sizeof(com));
+	for(auto itr = v.begin(); itr != v.end(); itr++){
+		std::string curCommand = std::string(" " + *itr);
+		write(STDOUT_FILENO, curCommand.c_str(), curCommand.size());
+	}
+	char newLine = '\n';
+	write(STDOUT_FILENO, &newLine, sizeof(newLine));
+}
 void clearLine(int length){
 	char deleteChar[] = "\b \b";
 	for(int i = 0; i < length; i++){

@@ -6,7 +6,7 @@
 std::vector<std::string> parseInput(std::string input, char delimiter){
 	int start = 0;
 	int end = 0;
-	char prev;
+	char prev = delimiter;
 	std::vector<std::string> v;
 	while(end < input.length()){
 		char CurChar = input.at(end);
