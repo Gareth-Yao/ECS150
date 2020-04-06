@@ -2,15 +2,14 @@
 #include "ReadInFunctions.h"
 #include "query.h"
 
-int main(){
+int main(int argc, char *argv[]){
 	std::vector<std::string> entryLog;
 	const std::string deleteChar = std::string("\b \b");
+	struct termios SavedTermAttributes;
+	SetNonCanonicalMode(STDIN_FILENO, &SavedTermAttributes);
+	char RXChar;
 	while(1){
-
 		//Print prompt
-		struct termios SavedTermAttributes;
-    	char RXChar;
-    	SetNonCanonicalMode(STDIN_FILENO, &SavedTermAttributes);
 		std::string dir = std::string(getcwd(NULL,0));
 		if(dir.size() > 16){
 			dir= shrinkChar(dir);
@@ -57,33 +56,39 @@ int main(){
     	if(entryLog.size() > 10){
     		entryLog.erase(entryLog.begin());
     	}
-
     	entryLog.push_back(command);
 
-		std::vector<std::string> v = parseInput(command,' ');
-		std::string functionName = v.at(0);
-		if(functionName.compare("ls") == 0){
-			ListFiles(v);
-		}else if(functionName.compare("cd") == 0){
-			ChangeDirectory(v.at(1));
-		}else if(functionName.compare("ff") == 0){
-			FindFiles(v);
-		}else if(functionName.compare("pwd") == 0){
-			PrintWorkingDirectory(v);
-		}else if(functionName.compare("exit") == 0){
-			break;
-		}else{
-			char com[] = "Command:";
-			write(STDOUT_FILENO, &com, sizeof(com));
-			for(auto itr = v.begin(); itr != v.end(); itr++){
-				std::string curCommand = std::string(" " + *itr);
-				write(STDOUT_FILENO, curCommand.c_str(), curCommand.size());
-			}
+    	//check piping
+    	std::vector<std::string> commands = parseInput(command,'|');
 
-			char newLine = '\n';
-			write(STDOUT_FILENO, &newLine, sizeof(newLine));
-		}
+    	for(auto temp : commands){
+    		std::vector<std::string> v = parseInput(temp,' ');
+			std::string functionName = v.at(0);
+			if(functionName.compare("ls") == 0){
+				ListFiles(v);
+			}else if(functionName.compare("cd") == 0){
+				ChangeDirectory(v);
+			}else if(functionName.compare("ff") == 0){
+				FindFiles(v);
+			}else if(functionName.compare("pwd") == 0){
+				PrintWorkingDirectory();
+			}else if(functionName.compare("exit") == 0){
+				goto EXIT;
+			}else{
+				char com[] = "Command:";
+				write(STDOUT_FILENO, &com, sizeof(com));
+				for(auto itr = v.begin(); itr != v.end(); itr++){
+					std::string curCommand = std::string(" " + *itr);
+					write(STDOUT_FILENO, curCommand.c_str(), curCommand.size());
+				}
+
+				char newLine = '\n';
+				write(STDOUT_FILENO, &newLine, sizeof(newLine));
+			}
+    	}
+		
 	}
+	EXIT:ResetCanonicalMode(STDIN_FILENO, &SavedTermAttributes);
     return 0;
 }
 
