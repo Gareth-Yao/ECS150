@@ -26,15 +26,47 @@ void ChangeDirectory(std::vector<std::string> commands){
  	
 
 }
-void FindFiles(std::vector<std::string> v){
-	char com[] = "Command:";
-	write(STDOUT_FILENO, &com, sizeof(com));
-	for(auto itr = v.begin(); itr != v.end(); itr++){
-		std::string curCommand = std::string(" " + *itr);
-		write(STDOUT_FILENO, curCommand.c_str(), curCommand.size());
+
+void dfs(std::string root, std::string file, std::vector<std::string> &paths){
+	auto dir = opendir(root.c_str());
+	if(dir == NULL){
+		return;
 	}
-	char newLine = '\n';
-	write(STDOUT_FILENO, &newLine, sizeof(newLine));
+
+	while(auto content = readdir(dir)){
+		std::string curFile = std::string(content->d_name);
+		if(curFile.compare("..") == 0 || curFile.compare(".") == 0){
+			continue;
+		}
+		if(DT_DIR == content->d_type){
+			dfs(root+"/"+curFile,file,paths);
+		}else if(curFile.compare(file) == 0){
+			paths.push_back(std::string(root + "\n"));
+		}
+	}
+	closedir(dir);
+}
+
+
+void FindFiles(std::vector<std::string> commands){
+	if(commands.size() == 1){
+		char errorMessage[] = "ff command requires a filename!\n";
+		write(STDOUT_FILENO, &errorMessage, sizeof(errorMessage));
+		return;
+	}
+
+	std::string target = std::string(".");
+	if(commands.size() > 2){
+		target = commands.at(2);
+	}
+
+	std::vector<std::string> paths;
+
+	dfs(target, commands.at(1), paths);
+
+	for(int i = 0; i<paths.size();i++){
+		write(STDOUT_FILENO, paths.at(i).c_str(), paths.at(i).size());
+	}
 }
 
 std::string getPermission(const char *filename){

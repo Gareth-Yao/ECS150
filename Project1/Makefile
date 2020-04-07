@@ -48,6 +48,6 @@ directories:
 	mkdir -p $(OBJ_DIR)
 	
 clean::
-	-rm $(GAME_OBJS) $(INC_DIR)/*.*~ $(SRC_DIR)/*.*~
+	-rm $(GAME_OBJS)
 	
 .PHONY: clean

@@ -40,9 +40,9 @@ int main(int argc, char *argv[]){
 	        }else if(RXChar == '\n'){
 	        	write(STDOUT_FILENO, &RXChar, sizeof(RXChar));
 	        	break;
-	        }else if(RXChar == 0x7F){
+	        }else if(RXChar == 0x7F && buffersize>0){
 	        	write(STDOUT_FILENO, deleteChar.c_str(), deleteChar.size());
-	        	buffersize++;
+	        	buffersize--;
 	        	if(!command.empty()){
 	        		command.pop_back();
 	        	}
