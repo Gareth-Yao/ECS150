@@ -9,18 +9,18 @@
 #include <string.h>
 #include <errno.h>
 void ChangeDirectory(std::vector<std::string> commands){
-	if(commands.size() > 1){
+	if(commands.size() > 1 && commands.at(1).compare(">") != 0){
 		std::string path = commands.at(1);
 		int returnValue = chdir(path.c_str());
  		if(returnValue < 0){
  		char errorMessage[] = "Error changing directory.\n";
- 		write(STDOUT_FILENO, &errorMessage, sizeof(errorMessage));
+ 		write(STDERR_FILENO, &errorMessage, sizeof(errorMessage));
  		}
 	}else{
 		int returnValue = chdir(getenv("HOME"));
  		if(returnValue < 0){
  		char errorMessage[] = "Error changing directory.\n";
- 		write(STDOUT_FILENO, &errorMessage, sizeof(errorMessage));
+ 		write(STDERR_FILENO, &errorMessage, sizeof(errorMessage));
  		}
 	}
  	
@@ -49,14 +49,14 @@ void dfs(std::string root, std::string file, std::vector<std::string> &paths){
 
 
 void FindFiles(std::vector<std::string> commands){
-	if(commands.size() == 1){
+	if(commands.size() == 1 || commands.at(1).compare(">") == 0){
 		char errorMessage[] = "ff command requires a filename!\n";
-		write(STDOUT_FILENO, &errorMessage, sizeof(errorMessage));
+		write(STDERR_FILENO, &errorMessage, sizeof(errorMessage));
 		return;
 	}
 
 	std::string target = std::string(".");
-	if(commands.size() > 2){
+	if(commands.size() > 2  && commands.at(1).compare(">") != 0){
 		target = commands.at(2);
 	}
 
@@ -74,7 +74,7 @@ std::string getPermission(const char *filename){
 	struct stat statbuf;
 	if(stat(filename, &statbuf) == -1){
 		std::string errorMessage = strerror(errno);
-		write(STDOUT_FILENO, errorMessage.c_str(), errorMessage.size());
+		write(STDERR_FILENO, errorMessage.c_str(), errorMessage.size());
 		return std::string("\n---------- ");
 	}
 	S_ISDIR(statbuf.st_mode) ? permission.push_back('d'):permission.push_back('-');
@@ -92,13 +92,13 @@ std::string getPermission(const char *filename){
 
 void ListFiles(std::vector<std::string> commands){
 	std::string target = std::string(".");
-	if(commands.size() > 1){
+	if(commands.size() > 1 && commands.at(1).compare(">") != 0){
 		target = commands.at(1);
 	}
 	auto dir = opendir(target.c_str());
 	if(dir == NULL){
 		std::string errorMessage = "Failed To Open Directory \"" + target + "/\".\n";
- 		write(STDOUT_FILENO, errorMessage.c_str(), errorMessage.size());
+ 		write(STDERR_FILENO, errorMessage.c_str(), errorMessage.size());
  		return;
 	}
 	while(auto content = readdir(dir)){

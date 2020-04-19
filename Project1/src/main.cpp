@@ -79,6 +79,9 @@ int main(int argc, char *argv[]){
     		std::vector<std::string> v = parseInput(temp,' ');
 			std::string functionName = v.at(0);
 
+			
+			
+
 			if(functionName.compare("exit") == 0){
 				goto EXIT;
 			}else if(functionName.compare("ls") == 0){
@@ -91,6 +94,7 @@ int main(int argc, char *argv[]){
 						dup2(fdpipe[1],STDOUT_FILENO);
 						close(fdpipe[1]);
 					}
+					checkRedirection(v);
 					ListFiles(v);
 					exit(0);
 				}else{
@@ -113,7 +117,7 @@ int main(int argc, char *argv[]){
 						dup2(fdpipe[1],STDOUT_FILENO);
 						close(fdpipe[1]);
 					}
-
+					checkRedirection(v);
 					FindFiles(v);
 					exit(0);
 				}else{
@@ -133,6 +137,7 @@ int main(int argc, char *argv[]){
 						dup2(fdpipe[1],STDOUT_FILENO);
 						close(fdpipe[1]);
 					}
+					checkRedirection(v);
 					PrintWorkingDirectory();
 					exit(0);
 				}else{
@@ -143,27 +148,30 @@ int main(int argc, char *argv[]){
 				close(fdpipe[1]);
 				prev = fdpipe[0];
 			}else{
-				//printf("KJk\n");
 				pipe(fdpipe);
 				child_pid = fork();
 				if(child_pid == 0){
 					dup2(prev, 0);
-					//close(fdpipe[0]);
-
 					if(i != commands.size() - 1){
 						dup2(fdpipe[1],STDOUT_FILENO);
 						close(fdpipe[1]);
 					}
-					
+					checkRedirection(v);
 					std::vector<char*> argv;
 					for(const auto arg : v){
+						if (arg.compare(">") == 0 || arg.compare("<") == 0){
+							break;
+						}
 						argv.push_back((char*)arg.data());
 					}
 					argv.push_back(nullptr);
 					// while(read(STDIN_FILENO, &RXChar, 1) > 0){
     	// 				write(STDOUT_FILENO, &RXChar, 1);
     	// 			}
+
 					if(execvp(v.at(0).c_str(), argv.data()) < 0){
+						std::string errorMessage = std::string("Failed To execute " + functionName + "\n");
+						write(STDERR_FILENO, errorMessage.c_str(), errorMessage.size());
 						exit(0);
 					}
 				} else{
