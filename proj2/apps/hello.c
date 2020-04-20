@@ -1,5 +1,4 @@
-#include "VirtualMachine.h" 	 	    		
-
+#include "VirtualMachine.h" 	    		
 void VMMain(int argc, char *argv[]){
     int Index;
     VMPrint("In VMMain:\n");
