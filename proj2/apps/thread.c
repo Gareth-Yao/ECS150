@@ -1,13 +1,16 @@
 #include "VirtualMachine.h" 	 	    		
-
+#include <stdio.h>
 #ifndef NULL
 #define NULL    ((void *)0)
 #endif
 
 void VMThread(void *param){
-    VMPrint("VMThread Alive\n");
+    TVMTick CurrentTick;
+    VMTickCount(&CurrentTick);
+    VMPrint("VMThread Alive, CurrentTick: %d\n", CurrentTick);
     VMThreadSleep(10);
-    VMPrint("VMThread Awake\n");
+    VMTickCount(&CurrentTick);
+    VMPrint("VMThread Awake, CurrentTick: %d\n", CurrentTick);
 }
 
 void VMMain(int argc, char *argv[]){
@@ -30,9 +33,11 @@ void VMMain(int argc, char *argv[]){
     }
     VMPrint("VMMain activating thread.\n");
     VMThreadActivate(VMThreadID);
+    TVMTick CurrentTick;
+    VMTickCount(&CurrentTick);
     VMPrint("VMMain going to sleep 50\n");
     VMThreadSleep(50);
-    VMPrint("VMMain Awake\nGoodbye\n");
+    VMPrint("VMMain Awake \nGoodbye\n");
     
 }
 
