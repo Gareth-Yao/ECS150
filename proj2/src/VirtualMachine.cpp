@@ -24,7 +24,7 @@ extern "C"{
 		TVMMemorySize _tMemsize;
 		void* _stackaddr;
 		SMachineContext _machineContext;
-
+		int _fileOPerationResult;
 		TCB(TVMThreadID tid, TVMThreadPriority tPrio, TVMThreadEntry tEntry,
 			void *param, TVMMemorySize tMemsize){
 			_tid = tid;
@@ -34,6 +34,7 @@ extern "C"{
 			_param = param;
 			_tMemsize = tMemsize;
 			_stackaddr = malloc(tMemsize);
+			_fileOPerationResult = -1;
 		}
 
 		void setStatus(TVMThreadState state){
@@ -71,17 +72,14 @@ extern "C"{
 	TVMMainEntry VMLoadModule(const char *module);
 	void VMUnloadModule(void);
 	TVMStatus VMFilePrint(int filedescriptor, const char *format, ...);
-		void machineCallBack(void *calldata, int result){
 
-		// if(result < 0){
-		// 	VMPrintError((const char *)calldata);
-		// }
-		return;
+	void scheduler(){
+
 	}
 
 	void alarmCallBack(void* calldata){
-		TMachineSignalState currentSignalState;
-		MachineSuspendSignals(&currentSignalState);
+		// TMachineSignalState currentSignalState;
+		// MachineSuspendSignals(&currentSignalState);
 		currentTick++;
 		auto got = sleepThreads.find((TVMTick)currentTick);
 		if(got != sleepThreads.end()){
@@ -94,18 +92,24 @@ extern "C"{
 			sleepThreads.erase(got);
 		}
 		TCB *running = threadVector[currentThread];
-		running->setStatus(VM_THREAD_STATE_WAITING);
+		if(threadQueue.size() != 0 && threadQueue.top()->_tPrio < running->_tPrio){
+			return;
+		}
+		running->setStatus(VM_THREAD_STATE_READY);
 		threadQueue.push(running);
 		TCB *nextThread = threadQueue.top();
 		threadQueue.pop();
 		nextThread->setStatus(VM_THREAD_STATE_RUNNING);
 		currentThread = nextThread->_tid;
-		MachineResumeSignals(&currentSignalState);
+		// MachineResumeSignals(&currentSignalState);
 		MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
 	}
 
 	void idleEntry(void* nothing){
-		while(1){}
+		MachineEnableSignals();
+		while(1){
+			
+		}
 	}
 	void emptyEntry(void* nothing){}
 
@@ -127,10 +131,163 @@ extern "C"{
 		return VM_STATUS_SUCCESS;
 	}
 
+	void fileCallBack(void *calldata, int result){
+		TCB* blocked = (TCB*) calldata;
+		if(result < 0){
+			blocked->_fileOPerationResult = -1;
+			VMPrintError("Failed to operate\n");
+		}else{
+			blocked->_fileOPerationResult = result;
+
+		}
+		blocked->setStatus(VM_THREAD_STATE_READY);
+		threadQueue.push(blocked);
+	}
+
+
 	TVMStatus VMFileWrite(int filedescriptor, void *data, int *length){
-		char callback[] = "Machine File Write";
-		MachineFileWrite(filedescriptor, data, *length, machineCallBack, callback);
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
+		TCB *running = threadVector[currentThread];
+		running->setStatus(VM_THREAD_STATE_WAITING);
+		TCB *nextThread;
+		if(threadQueue.size() != 0){
+			nextThread = threadQueue.top();
+			threadQueue.pop();
+		}else{
+			nextThread = threadVector[idleTid];
+		}
+		MachineFileWrite(filedescriptor, data, *length, fileCallBack, running);
+
+		if(nextThread->_tid == idleTid){
+			MachineResumeSignals(&currentSignalState);
+			VMThreadActivate(idleTid);
+		}else{
+			currentThread = nextThread->_tid;
+			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
+			MachineResumeSignals(&currentSignalState);
+			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
+		}	
 		return VM_STATUS_SUCCESS;
+	}
+
+	TVMStatus VMFileOpen(const char *filename, int flags, int mode, int *filedescriptor){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
+		TCB *running = threadVector[currentThread];
+		running->setStatus(VM_THREAD_STATE_WAITING);
+		TCB *nextThread;
+		if(threadQueue.size() != 0){
+			nextThread = threadQueue.top();
+			threadQueue.pop();
+		}else{
+			nextThread = threadVector[idleTid];
+		}
+		MachineFileOpen(filename, flags, mode, fileCallBack, running);
+		if(nextThread->_tid == idleTid){
+			MachineResumeSignals(&currentSignalState);
+			VMThreadActivate(idleTid);
+		}else{
+			currentThread = nextThread->_tid;
+			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
+			MachineResumeSignals(&currentSignalState);
+			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
+		}
+		if(running->_fileOPerationResult != -1){
+			*filedescriptor = running->_fileOPerationResult;
+			running->_fileOPerationResult = -1;
+			return VM_STATUS_SUCCESS;
+		}else{
+			return VM_STATUS_FAILURE;
+		}	
+	}
+
+	TVMStatus VMFileClose(int filedescriptor){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
+		TCB *running = threadVector[currentThread];
+		running->setStatus(VM_THREAD_STATE_WAITING);
+		TCB *nextThread;
+		if(threadQueue.size() != 0){
+			nextThread = threadQueue.top();
+			threadQueue.pop();
+		}else{
+			nextThread = threadVector[idleTid];
+		}
+		MachineFileClose(filedescriptor, fileCallBack, running);
+		
+		if(nextThread->_tid == idleTid){
+			MachineResumeSignals(&currentSignalState);
+			VMThreadActivate(idleTid);
+		}else{
+			currentThread = nextThread->_tid;
+			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
+			MachineResumeSignals(&currentSignalState);
+			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
+		}
+		return VM_STATUS_FAILURE;
+	}
+	TVMStatus VMFileRead(int filedescriptor, void *data, int *length){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
+		TCB *running = threadVector[currentThread];
+		running->setStatus(VM_THREAD_STATE_WAITING);
+		TCB *nextThread;
+		if(threadQueue.size() != 0){
+			nextThread = threadQueue.top();
+			threadQueue.pop();
+		}else{
+			nextThread = threadVector[idleTid];
+		}
+		MachineFileRead(filedescriptor, data, *length, fileCallBack, running);
+		if(nextThread->_tid == idleTid){
+			MachineResumeSignals(&currentSignalState);
+			VMThreadActivate(idleTid);
+		}else{
+			currentThread = nextThread->_tid;
+			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
+			MachineResumeSignals(&currentSignalState);
+			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
+		}
+		if(running->_fileOPerationResult != -1){
+			*length = running->_fileOPerationResult;
+			running->_fileOPerationResult = -1;
+			return VM_STATUS_SUCCESS;
+		}else{
+			return VM_STATUS_FAILURE;
+		}
+
+	}
+	TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
+		TCB *running = threadVector[currentThread];
+		running->setStatus(VM_THREAD_STATE_WAITING);
+		TCB *nextThread;
+		if(threadQueue.size() != 0){
+			nextThread = threadQueue.top();
+			threadQueue.pop();
+		}else{
+			nextThread = threadVector[idleTid];
+		}
+		MachineFileSeek(filedescriptor, offset, whence, fileCallBack, running);
+		
+		if(nextThread->_tid == idleTid){
+			MachineResumeSignals(&currentSignalState);
+			VMThreadActivate(idleTid);
+		}else{
+			currentThread = nextThread->_tid;
+			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
+			MachineResumeSignals(&currentSignalState);
+			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
+		}
+		if(running->_fileOPerationResult != -1){
+			*newoffset = running->_fileOPerationResult;
+			running->_fileOPerationResult = -1;
+			return VM_STATUS_SUCCESS;
+		}else{
+			return VM_STATUS_FAILURE;
+		}	
 	}
 
 	void runThreadEntry(void *param){
