@@ -58,7 +58,6 @@ TVMStatus VMFileRead(int filedescriptor, void *data, int *length);
 TVMStatus VMFileWrite(int filedescriptor, void *data, int *length);
 TVMStatus VMFileSeek(int filedescriptor, int offset, int whence, int *newoffset);
 TVMStatus VMFilePrint(int filedescriptor, const char *format, ...);
-
 #ifdef __cplusplus
 }
 #endif

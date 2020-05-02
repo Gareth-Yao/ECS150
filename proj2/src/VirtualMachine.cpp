@@ -73,13 +73,9 @@ extern "C"{
 	void VMUnloadModule(void);
 	TVMStatus VMFilePrint(int filedescriptor, const char *format, ...);
 
-	void scheduler(){
-
-	}
-
 	void alarmCallBack(void* calldata){
-		// TMachineSignalState currentSignalState;
-		// MachineSuspendSignals(&currentSignalState);
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		currentTick++;
 		auto got = sleepThreads.find((TVMTick)currentTick);
 		if(got != sleepThreads.end()){
@@ -91,6 +87,18 @@ extern "C"{
 			}
 			sleepThreads.erase(got);
 		}
+		// std::vector<TCB*> tempqueue;
+		// while(threadQueue.size() != 0){
+		// 	TCB* temp = threadQueue.top();
+		// 	threadQueue.pop();
+		// 	std::cout << temp->_tid;
+		// 	tempqueue.push_back(temp);
+		// }
+		// for(int i = 0; i < tempqueue.size();i++){
+		// 	threadQueue.push(tempqueue[i]);
+		// }
+		// std::cout << "\n";
+		//std::cout << "Queue size: " << threadQueue.size() << "\n";
 		TCB *running = threadVector[currentThread];
 		if(threadQueue.size() != 0 && threadQueue.top()->_tPrio < running->_tPrio){
 			return;
@@ -101,11 +109,14 @@ extern "C"{
 		threadQueue.pop();
 		nextThread->setStatus(VM_THREAD_STATE_RUNNING);
 		currentThread = nextThread->_tid;
-		// MachineResumeSignals(&currentSignalState);
+		//MachineResumeSignals(&currentSignalState);
+		//std::cout << "Alarm SWitching to " << nextThread->_tid << "\n";
 		MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
+		MachineResumeSignals(&currentSignalState);
 	}
 
 	void idleEntry(void* nothing){
+		//std::cout << "In Idle\n";
 		MachineEnableSignals();
 		while(1){
 			
@@ -123,7 +134,6 @@ extern "C"{
 		MachineEnableSignals();
 		VMThreadCreate(idleEntry, NULL, 0x100000, VM_THREAD_PRIORITY_LOW, &idleTid);
 		VMThreadCreate(emptyEntry, NULL, 0x01, VM_THREAD_PRIORITY_NORMAL,&mainTid);
-		// VMThreadActivate(idleTid);
 		MachineRequestAlarm(tickms * 1000,alarmCallBack,NULL);
 		mainEntry(argc, argv);
 		MachineTerminate();
@@ -132,16 +142,55 @@ extern "C"{
 	}
 
 	void fileCallBack(void *calldata, int result){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		TCB* blocked = (TCB*) calldata;
+		//std::cout << "In "<< blocked->_tid << " File Callback\n";
 		if(result < 0){
 			blocked->_fileOPerationResult = -1;
 			VMPrintError("Failed to operate\n");
 		}else{
 			blocked->_fileOPerationResult = result;
-
-		}
+ 		}
 		blocked->setStatus(VM_THREAD_STATE_READY);
-		threadQueue.push(blocked);
+
+		TCB *running = threadVector[currentThread];
+		if(blocked->_tPrio > running->_tPrio){
+			running->setStatus(VM_THREAD_STATE_READY);
+			threadQueue.push(running);
+			currentThread = blocked->_tid;
+			blocked->setStatus(VM_THREAD_STATE_RUNNING);
+			//std::cout << "PRint SWitching to " << blocked->_tid << "\n";
+			MachineContextSwitch(&(running->_machineContext), &(blocked->_machineContext));
+		}else{
+			threadQueue.push(blocked);
+		}
+		// threadQueue.push(blocked);
+		// std::vector<TCB*> tempqueue;
+		// while(threadQueue.size() != 0){
+		// 	TCB* temp = threadQueue.top();
+		// 	threadQueue.pop();
+		// 	std::cout << temp->_tid;
+		// 	tempqueue.push_back(temp);
+		// }
+		// for(int i = 0; i < tempqueue.size();i++){
+		// 	threadQueue.push(tempqueue[i]);
+		// }
+		// std::cout << "\n";
+
+		// if(threadQueue.size() != 0 && threadQueue.top()->_tPrio > running->_tPrio){
+		// 	TCB * nextThread = threadQueue.top();
+		// 	threadQueue.pop();
+		// 	running->setStatus(VM_THREAD_STATE_READY);
+		// 	threadQueue.push(running);
+		// 	currentThread = nextThread->_tid;
+		// 	nextThread->setStatus(VM_THREAD_STATE_RUNNING);		
+		// 	MachineResumeSignals(&currentSignalState);
+		// 	std::cout << "PRint Callback SWitching to " << blocked->_tid << "\n";
+		// 	MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
+		// 	return;
+		// }
+		MachineResumeSignals(&currentSignalState);
 	}
 
 
@@ -160,14 +209,16 @@ extern "C"{
 		MachineFileWrite(filedescriptor, data, *length, fileCallBack, running);
 
 		if(nextThread->_tid == idleTid){
-			MachineResumeSignals(&currentSignalState);
+			//MachineResumeSignals(&currentSignalState);
 			VMThreadActivate(idleTid);
 		}else{
 			currentThread = nextThread->_tid;
 			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
-			MachineResumeSignals(&currentSignalState);
+			//MachineResumeSignals(&currentSignalState);
+			//std::cout << "PRint SWitching to " << nextThread->_tid << "\n";
 			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
-		}	
+		}
+		MachineResumeSignals(&currentSignalState);
 		return VM_STATUS_SUCCESS;
 	}
 
@@ -185,12 +236,12 @@ extern "C"{
 		}
 		MachineFileOpen(filename, flags, mode, fileCallBack, running);
 		if(nextThread->_tid == idleTid){
-			MachineResumeSignals(&currentSignalState);
+			//MachineResumeSignals(&currentSignalState);
 			VMThreadActivate(idleTid);
 		}else{
 			currentThread = nextThread->_tid;
 			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
-			MachineResumeSignals(&currentSignalState);
+			//MachineResumeSignals(&currentSignalState);
 			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
 		}
 		if(running->_fileOPerationResult != -1){
@@ -199,7 +250,7 @@ extern "C"{
 			return VM_STATUS_SUCCESS;
 		}else{
 			return VM_STATUS_FAILURE;
-		}	
+		}
 	}
 
 	TVMStatus VMFileClose(int filedescriptor){
@@ -291,6 +342,7 @@ extern "C"{
 	}
 
 	void runThreadEntry(void *param){
+		MachineEnableSignals();
 		TCB *thread = threadVector[currentThread];
 		thread->_tEntry(thread->_param);
 		VMThreadTerminate(currentThread);
@@ -307,19 +359,25 @@ extern "C"{
 	}
 
 	TVMStatus VMThreadCreate(TVMThreadEntry entry, void *param, TVMMemorySize memsize, TVMThreadPriority prio, TVMThreadIDRef tid){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		if(NULL == entry || NULL == tid){
 			return VM_STATUS_ERROR_INVALID_PARAMETER;
 		}
 		*tid = threadVector.size();
 		TCB *newThread = new TCB(*tid, prio, entry, param, memsize);
 		threadVector.push_back(newThread);
+		MachineResumeSignals(&currentSignalState);
 		return VM_STATUS_SUCCESS;
 	}
 
 	TVMStatus VMThreadActivate(TVMThreadID thread){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		TCB *target = threadVector[thread];
 		TCB *running = threadVector[currentThread];
 		MachineContextCreate(&(target->_machineContext), runThreadEntry, NULL, (void*)target->_stackaddr, target->_tMemsize);
+		
 		if(target->_tPrio > running->_tPrio){
 			target->setStatus(VM_THREAD_STATE_RUNNING);
 			running->setStatus(VM_THREAD_STATE_READY);
@@ -334,18 +392,23 @@ extern "C"{
 			target->setStatus(VM_THREAD_STATE_READY);
 			threadQueue.push(target);		
 		}
-
+		MachineResumeSignals(&currentSignalState);
 		return VM_STATUS_SUCCESS;
 	}
 
 	TVMStatus VMThreadTerminate(TVMThreadID thread){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		TCB* running = threadVector[thread];
 		running->setStatus(VM_THREAD_STATE_DEAD);
-
+		MachineResumeSignals(&currentSignalState);
 		return VM_STATUS_SUCCESS;
 	}
 
 	TVMStatus VMThreadSleep(TVMTick tick){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
+		//std::cout << "IN Sleep\n";
 		TVMTick targetTick = currentTick + tick;
 		TCB *nextThread;
 		if(threadQueue.size() != 0){
@@ -362,10 +425,9 @@ extern "C"{
 
 		idList.push_back((TVMThreadID)currentThread);
 		sleepThreads.emplace(targetTick, idList);
-
 		TCB *running = threadVector[currentThread];
 		running->setStatus(VM_THREAD_STATE_WAITING);
-		
+		//std::cout << "Sleep switching to " << nextThread->_tid << "\n";
 		if(nextThread->_tid == idleTid){
 			VMThreadActivate(idleTid);
 		}else{
@@ -373,53 +435,73 @@ extern "C"{
 			nextThread->setStatus(VM_THREAD_STATE_RUNNING);
 			MachineContextSwitch(&(running->_machineContext), &(nextThread->_machineContext));
 		}	
-	
+		MachineResumeSignals(&currentSignalState);
 		return VM_STATUS_SUCCESS;
 	}
 
 	TVMStatus VMThreadID(TVMThreadIDRef threadref){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		if(threadref == NULL){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_ERROR_INVALID_PARAMETER;
 		}
 		if(*threadref = currentThread){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_SUCCESS;
 		}else{
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_FAILURE;
 		}
 		
 	}
 	TVMStatus VMThreadState(TVMThreadID thread, TVMThreadStateRef stateref){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		if(stateref == NULL){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_ERROR_INVALID_PARAMETER;
 		}
 		TCB *target = threadVector[thread];
 		if(*stateref = target->_tState){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_SUCCESS;
 		}else{
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_FAILURE;
 		}
 
 	}
 
 	TVMStatus VMTickMS(int *tickmsref){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		if(tickmsref == NULL){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_ERROR_INVALID_PARAMETER;
 		}
 		if(*tickmsref = msPerTick){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_SUCCESS;
 		}else{
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_FAILURE;
 		}
 
 	}
 
 	TVMStatus VMTickCount(TVMTickRef tickref){
+		TMachineSignalState currentSignalState;
+		MachineSuspendSignals(&currentSignalState);
 		if(tickref == NULL){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_ERROR_INVALID_PARAMETER;
 		}
 		if(*tickref = currentTick){
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_SUCCESS;
 		}else{
+			MachineResumeSignals(&currentSignalState);
 			return VM_STATUS_FAILURE;
 		}
 	}
